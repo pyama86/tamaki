@@ -19,4 +19,4 @@ COPY Gemfile Gemfile.lock /opt/tamaki/
 RUN bundle install
 
 COPY . /opt/tamaki
-CMD bundle exec rackup
+CMD bundle exec puma
