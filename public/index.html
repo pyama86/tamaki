@@ -84,6 +84,7 @@ $(function() {
       url: '/upload', // サーバーのアップロード処理のエンドポイントURL
       type: 'POST',
       data: formData,
+      timeout: 3600000,
       contentType: false,
       processData: false,
       cache: false,
