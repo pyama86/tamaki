@@ -2,6 +2,10 @@ GEM
   remote: https://rubygems.org/
   specs:
     base64 (0.2.0)
+    chronic_duration (0.10.6)
+      numerizer (~> 0.1.1)
+    concurrent-ruby (1.2.2)
+    connection_pool (2.4.1)
     event_stream_parser (1.0.0)
     faraday (2.7.12)
       base64
@@ -10,21 +14,35 @@ GEM
     faraday-multipart (1.0.4)
       multipart-post (~> 2)
     faraday-net_http (3.0.2)
+    foreman (0.87.2)
     multi_json (1.15.0)
     multipart-post (2.3.0)
     mustermann (3.0.0)
       ruby2_keywords (~> 0.0.1)
     nio4r (2.7.0)
+    numerizer (0.1.1)
     puma (6.4.0)
       nio4r (~> 2.0)
     rack (2.2.8)
     rack-protection (3.1.0)
       rack (~> 2.2, >= 2.2.4)
+    redis (5.0.8)
+      redis-client (>= 0.17.0)
+    redis-client (0.19.0)
+      connection_pool
     ruby-openai (6.3.1)
       event_stream_parser (>= 0.3.0, < 2.0.0)
       faraday (>= 1)
       faraday-multipart (>= 1)
     ruby2_keywords (0.0.5)
+    sidekiq (7.2.0)
+      concurrent-ruby (< 2)
+      connection_pool (>= 2.3.0)
+      rack (>= 2.2.4)
+      redis-client (>= 0.14.0)
+    sidekiq-status (3.0.3)
+      chronic_duration
+      sidekiq (>= 6.0, < 8)
     sinatra (3.1.0)
       mustermann (~> 3.0)
       rack (~> 2.2, >= 2.2.4)
@@ -43,8 +61,12 @@ PLATFORMS
 
 DEPENDENCIES
   faraday
+  foreman
   puma
+  redis
   ruby-openai
+  sidekiq
+  sidekiq-status
   sinatra
   sinatra-contrib
 

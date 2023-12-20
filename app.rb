@@ -1,56 +1,26 @@
 require 'sinatra'
 require 'sinatra/contrib'
-require 'tempfile'
+require 'tmpdir'
 require 'json'
-require 'shellwords'
-require 'openai'
+require 'sidekiq/api'
+require 'sidekiq-status'
+require './worker'
 
 set :public_folder, 'public'
 
+Sidekiq.configure_client do |config|
+  Sidekiq::Status.configure_client_middleware config, expiration: 3600
+  config.redis = { url: ENV['REDIS_URL'] || 'redis://localhost:6379', db: ENV['REDIS_DB'] || 1 }
+end
+
 class WebApp < Sinatra::Base
+  enable :sessions
   configure :development do
     register Sinatra::Reloader
   end
 
-  def convert_audio_to_text(audio_path, output_path)
-    system("ffmpeg -i #{::Shellwords.escape(audio_path)} -ar 16000 -ac 1 -c:a pcm_s16le #{::Shellwords.escape(output_path)}.wav")
-    system("#{(ENV['WHISPER_PATH'] && ::File.join(ENV['WHISPER_PATH'],
-                                                  'main')) || './main'} -l ja -t 4 -m #{(ENV['WHISPER_PATH'] && ::File.join(ENV['WHISPER_PATH'],
-                                                                                                                            'models')) || './models'}/ggml-base.bin -otxt #{::Shellwords.escape(output_path)}.txt #{::Shellwords.escape(output_path)}.wav")
-
-    File.read("#{output_path}.wav.txt")
-  end
-
-  def client
-    raise 'OPENAI_API_KEY is not set' unless ENV['OPENAI_API_KEY']
-
-    @client ||= ::OpenAI::Client.new(access_token: ENV['OPENAI_API_KEY'])
-  end
-
-  def summarize_text(text)
-    question = <<-QUESTION
-    あなたに、whisperで自動で書き起こしした文章を渡します。下記の要件の通りに、文章を要約してください。
-
-    1. 議事録として、もれなく要点を抑えていること
-    2. あなたの言葉で、文章を要約してください
-    3. 適切に段落を分けて、適宜見出しをつけてください
-    4. 誤字、脱字については修正、加筆して下さい
-    5. 結果はマークダウンで出力してください。
-    6. 出力は```のようなテンプレートリテラルで囲まないでください。
-
-    ## テキスト
-    #{text}
-    QUESTION
-
-    response = client.chat(
-      parameters: {
-        model: ENV['OPENAI_MODEL'] || 'gpt-4-1106-preview',
-        messages: [{ role: 'user', content: question }],
-        temperature: 0.7
-      }
-    )
-
-    response.dig('choices', 0, 'message', 'content')
+  def redis
+    @redis ||= Redis.new(url: ENV['REDIS_URL'] || 'redis://localhost:6379', db: ENV['REDIS_DB'] || 1)
   end
 
   post '/upload' do
@@ -59,24 +29,25 @@ class WebApp < Sinatra::Base
     end
 
     ext = File.extname(name)
-    tempfile = Tempfile.new(['uploaded_', ext])
+    tmpdir = Dir.tmpdir
+    path = File.join(tmpdir, "upload-#{Time.now.strftime('%Y%m%d%H%M%S')}#{ext}")
     begin
-      path = tempfile.path
-      File.open(path, 'wb') do |f|
-        f.write(tmpfile.read)
-      end
+      File.binwrite(path, tmpfile.read)
 
-      text = convert_audio_to_text(path, path)
-      summary = summarize_text(text)
-
+      # データストアを使いたくないので、同じホストで動いているSidekiqにジョブを投げる
+      job_id = JobWorker.set(queue: ENV['HOSTNAME'] || `hostname`.strip).perform_async(tmpdir, path)
+      session[:job_id] = job_id
       content_type :json
-      { summary: summary }.to_json
+      { job_id: job_id }.to_json
     rescue StandardError => e
       { error: e.message }.to_json
-    ensure
-      tempfile.close
-      tempfile.unlink
     end
+  end
+  get '/status/:job_id' do
+    result = nil
+    job_status = Sidekiq::Status.status(params[:job_id])
+    result = redis.get("job_#{params[:job_id]}_result") if job_status == :complete
+    { status: job_status, result: result }.to_json
   end
 
   get '/' do

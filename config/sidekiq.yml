@@ -1,0 +1,3 @@
+:queues:
+- <%= ENV['HOSTNAME'] || `hostname`.strip %>
+
