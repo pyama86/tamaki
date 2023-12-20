@@ -32,7 +32,11 @@ class WebApp < Sinatra::Base
     tmpdir = Dir.tmpdir
     path = File.join(tmpdir, "upload-#{Time.now.strftime('%Y%m%d%H%M%S')}#{ext}")
     begin
-      File.binwrite(path, tmpfile.read)
+      File.open(path, 'wb') do |f|
+        while chunk = tmpfile.read(1024 * 1024 * 4) # 4MB のチャンクサイズ
+          f.write(chunk)
+        end
+      end
 
       # データストアを使いたくないので、同じホストで動いているSidekiqにジョブを投げる
       job_id = JobWorker.set(queue: ENV['HOSTNAME'] || `hostname`.strip).perform_async(tmpdir, path)
