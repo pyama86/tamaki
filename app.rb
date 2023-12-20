@@ -6,8 +6,6 @@ require 'sidekiq/api'
 require 'sidekiq-status'
 require './worker'
 
-set :public_folder, 'public'
-
 Sidekiq.configure_client do |config|
   Sidekiq::Status.configure_client_middleware config, expiration: 3600
   config.redis = { url: ENV['REDIS_URL'] || 'redis://localhost:6379', db: ENV['REDIS_DB'] || 1 }
@@ -55,6 +53,7 @@ class WebApp < Sinatra::Base
   end
 
   get '/' do
-    send_file 'public/index.html'
+    @job_id = session[:job_id]
+    erb :index
   end
 end

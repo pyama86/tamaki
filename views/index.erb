@@ -129,7 +129,10 @@ $(function() {
       }
     });
   }
-
+  <% if @job_id %>
+  startUpload();
+  pollStatus('<%= @job_id %>');
+  <% end %>
 });
 
 
