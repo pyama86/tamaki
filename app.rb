@@ -29,7 +29,7 @@ class WebApp < Sinatra::Base
     end
 
     ext = File.extname(name)
-    tmpdir = Dir.tmpdir
+    tmpdir = '/tmp'
     path = File.join(tmpdir, "upload-#{Time.now.strftime('%Y%m%d%H%M%S')}#{ext}")
     begin
       File.binwrite(path, tmpfile.read)
