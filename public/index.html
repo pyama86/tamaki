@@ -1,0 +1,199 @@
+<!DOCTYPE html
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamaki</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+<script>
+$(function() {
+  var dropZone = $('#drop-zone');
+  var fileInput = $('#file-input');
+  var loader = $('#loader');
+  var isUploading = false; // アップロード中かどうかのフラグ
+
+  // コピーボタンクリックイベント
+  $('#copyButton').on('click', function() {
+    // モーダルからテキストを取得する
+    var textToCopy = $('#uploadResult').html().replace(/<br>/g, '\n');
+    // クリップボードにテキストをコピーする
+    navigator.clipboard.writeText(textToCopy).then(function() {
+      // コピーが成功したらフィードバックをユーザーに提供する
+      alert('クリップボードにコピーしました。');
+    }).catch(function(error) {
+      // コピーに失敗したときのエラーハンドリング
+      alert('コピーに失敗しました：', error);
+    });
+  });
+
+  dropZone.on('click', function(e) {
+    if (!isUploading) { // アップロード中でなければ実行
+      fileInput.click();
+    }
+  });
+
+  fileInput.on('change', function() {
+    var files = $(this)[0].files;
+    if (files.length && !isUploading) { // ファイルを選択し、かつアップロード中でなければ実行
+      uploadFile(files[0]);
+    }
+  });
+
+  dropZone.on('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isUploading) { // アップロード中でなければスタイルの変更を実行
+      dropZone.addClass('hover');
+    }
+  });
+
+  dropZone.on('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isUploading) { // アップロード中でなければスタイルの変更を実行
+      dropZone.removeClass('hover');
+    }
+  });
+
+  dropZone.on('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isUploading) { // アップロード中ならば何もせずに終了
+      return;
+    }
+    dropZone.removeClass('hover');
+
+    var files = e.originalEvent.dataTransfer.files;
+    if (files.length) {
+      uploadFile(files[0]);
+    }
+  });
+  function uploadFile(file) {
+    var formData = new FormData();
+    formData.append('file', file);
+
+    // アップロード中のクラスを追加してアイコンを表示
+    loader.show();
+    dropZone.addClass('dropzone-loading');
+    isUploading = true;
+
+    $.ajax({
+      url: '/upload', // サーバーのアップロード処理のエンドポイントURL
+      type: 'POST',
+      data: formData,
+      contentType: false,
+      processData: false,
+      cache: false,
+      success: function(response) {
+        // アップロードが完了したらクラスを削除してアイコンを隠す
+        isUploading = false;
+        loader.hide();
+        dropZone.removeClass('dropzone-loading');
+
+        $('#uploadResult').html((response.summary || "アップロードに成功しましたが、結果が空です。エラー:" + response.error).replace(/\n/g, '<br>'));
+        $('#resultModal').modal('show');
+      },
+      error: function(xhr) { // 通信失敗時の処理
+        isUploading = false;
+        loader.hide();
+        dropZone.removeClass('dropzone-loading');
+        var errorResult = xhr.status === 0 ? "ファイルのアップロードに失敗しました。" : JSON.parse(xhr.responseText).error;
+        $('#uploadResult').text(errorResult);
+        $('#resultModal').modal('show');
+      }
+    });
+  }
+
+});
+</script>
+<style>
+  .upload-container {
+    max-width: 600px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  .dropzone {
+    position: relative;
+    padding: 3rem 1rem;
+    border: 3px dashed #007bff;
+    border-radius: .375rem;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+  }
+  .dropzone:hover {
+    background-color: #e2e6ea;
+    border-color: #0056b3;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  .dropzone-loading:after {
+    content: '\f0ee'; /* cloud-upload-alt icon from FontAwesome */
+    font-family: 'FontAwesome';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4rem;
+    color: #007bff;
+  }
+  .dropzone p {
+    font-size: 1.25rem;
+    color: #333;
+    margin-top: 8rem;
+  }
+  .loader {
+    display: none;
+    margin-top: 15px;
+  }
+  .loader.visible {
+    display: block;
+  }
+  .loader .spinner-border {
+    width: 3rem;
+    height: 3rem;
+  }
+</style>
+</head>
+<body>
+
+  <div class="container upload-container">
+    <h3 class="text-center mb-4">ファイルアップローダー</h3>
+    <div id="drop-zone" class="dropzone text-center">
+      <p>ファイルをドラッグ&amp;ドロップ<br>または、こちらをクリックして選択してください。</p>
+    </div>
+    <div class="loader text-center" id="loader">
+      <span class="spinner-border spinner-border-xl" role="status" aria-hidden="true"></span>
+      <p>処理中です...</p>
+    </div>
+    <input type="file" id="file-input" hidden>
+  </div>
+
+  <div class="modal fade" id="resultModal" tabindex="-1" role="dialog" aria-labelledby="resultModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="resultModalLabel">アップロード結果</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <!-- アップロード結果のテキストをここに表示します -->
+          <p id="uploadResult"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">閉じる</button>
+          <button type="button" class="btn btn-primary" id="copyButton">コピー</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
