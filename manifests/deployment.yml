@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gijirock
+  namespace: default
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      name: gijirock
+  template:
+    metadata:
+      labels:
+        name: gijirock
+    spec:
+      initContainers:
+      - args:
+        - -c
+        - chmod 1777 /tmp
+        command:
+        - /bin/sh
+        image: library/alpine:latest
+        name: setup-app-tmpdir
+        volumeMounts:
+        - mountPath: /tmp
+          name: shared-tmp
+        resources:
+          requests:
+            cpu: 30m
+            memory: 64M
+          limits:
+            cpu: 100m
+            memory: 128M
+      containers:
+      - name: gijirock
+        resources:
+          requests:
+            cpu: 100m
+            memory: 263M
+          limits:
+            cpu: 1000m
+            memory: 512M
+        imagePullPolicy: Always
+        image: ghcr.io/pyama86/tamaki:sha-db52994@sha256:8cbb9a5efe3b9f8323ba45ce5fa9550620d6a745fd6a0cd1d0267369467e7e81
+        command:
+          - bundle
+          - exec
+          - puma
+        ports:
+        - containerPort: 9292
+        livenessProbe:
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          tcpSocket:
+            port: 9292
+        readinessProbe:
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          tcpSocket:
+            port: 9292
+        env:
+          - name: REDIS_URL
+            value: "redis://gijirock-redis-service:6379"
+        volumeMounts:
+        - name: shared-tmp
+          mountPath: /tmp
+      - name: gijirock-worker
+        resources:
+          requests:
+            cpu: 100m
+            memory: 263M
+          limits:
+            cpu: 2000m
+            memory: 4G
+        imagePullPolicy: Always
+        image: ghcr.io/pyama86/tamaki:sha-db52994@sha256:8cbb9a5efe3b9f8323ba45ce5fa9550620d6a745fd6a0cd1d0267369467e7e81
+        command:
+          - bundle
+          - exec
+          - sidekiq
+          - -r
+          - ./worker.rb
+          - -C
+          - config/sidekiq.yml
+        env:
+          - name: WHISPER_PATH
+            value: /opt/whisper
+          - name: OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: gijirock
+                key: openai-secret
+          - name: REDIS_URL
+            value: "redis://gijirock-redis-service:6379"
+        volumeMounts:
+        - name: shared-tmp
+          mountPath: /tmp
+      volumes:
+      - name: shared-tmp
+        emptyDir: {}

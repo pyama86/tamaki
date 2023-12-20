@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gijirock-redis-service
+  namespace: default
+spec:
+  selector:
+    app.kubernetes.io/name: gijirock-redis
+  ports:
+  - protocol: TCP
+    port: 6379
+    targetPort: 6379
