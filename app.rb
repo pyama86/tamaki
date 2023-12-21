@@ -48,12 +48,22 @@ class WebApp < Sinatra::Base
   get '/status/:job_id' do
     result = nil
     job_status = Sidekiq::Status.status(params[:job_id])
-    result = redis.get("job_#{params[:job_id]}_result") if job_status == :complete
+    if job_status == :complete
+      result = redis.get("job_#{params[:job_id]}_result")
+      session[:job_id] = nil
+    end
     { status: job_status, result: result }.to_json
   end
 
   get '/' do
-    @job_id = session[:job_id]
+    if session[:job_id]
+      status = Sidekiq::Status.status(session[:job_id])
+      @job_id = if %i[working queued retrying].include?(status)
+                  session[:job_id]
+                else
+                  session[:job_id] = nil
+                end
+    end
     erb :index
   end
 end
