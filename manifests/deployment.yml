@@ -1,9 +1,10 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: gijirock
   namespace: default
 spec:
+  serviceName: "gijirock"
   replicas: 4
   selector:
     matchLabels:
@@ -38,8 +39,8 @@ spec:
             cpu: 100m
             memory: 263M
           limits:
-            cpu: 1000m
-            memory: 512M
+            cpu: 4000m
+            memory: 4G
         imagePullPolicy: Always
         image: ghcr.io/pyama86/tamaki:sha-89aedea@sha256:8006ca118a1c50094c1e1272b2f7a6afa9a2780141edf65fc6a92830c5ae3311
         command:
